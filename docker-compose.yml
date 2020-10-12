@@ -1,0 +1,75 @@
+version: '3'
+
+services:
+  redis:
+    image: "redis:alpine"
+    restart: always
+    container_name: vz_redis
+    expose:
+      - 6379
+    sysctls:
+      net.core.somaxconn: '65535'
+  db:
+    restart: always
+    volumes:
+      - vz_postgres_data:/var/lib/postgresql/data/
+    image: postgres:12
+    environment:
+      - POSTGRES_DB=vz_parser
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123
+    container_name: vz_db
+  web:
+    build: .
+    command: gunicorn -t 180 -w 3 vz_parser_frontend.wsgi:application --bind 0.0.0.0:8000
+    restart: always
+    env_file:
+      - prod.env
+    volumes:
+      - vz_static_volume:/code/static
+    expose:
+      - 8000
+    depends_on:
+      - redis
+      - db
+      - celery_worker
+      - celery_beat
+    container_name: vz_web
+  celery_worker:
+    build: .
+    command: celery --app=vz_parser_frontend worker --loglevel=DEBUG
+    container_name: vz_celery_worker
+    restart: always
+    entrypoint: ''
+    env_file:
+      - prod.env
+    depends_on:
+      - db
+      - redis
+  celery_beat:
+    build: .
+    command: celery --app=vz_parser_frontend beat --loglevel=DEBUG
+    container_name: vz_celery_beat
+    restart: always
+    entrypoint: ''
+    env_file:
+      - prod.env
+    depends_on:
+      - db
+      - redis
+  nginx:
+    build: ./nginx
+    restart: always
+    container_name: vz_nginx
+    volumes:
+      - vz_static_volume:/code/static
+    ports:
+      - 1338:80
+    depends_on:
+      - web
+      - redis
+      - db
+
+volumes:
+  vz_postgres_data:
+  vz_static_volume:
