@@ -9,7 +9,7 @@ from django.utils import timezone
 from vz_parser_frontend.settings import TELEGRAM_API_TOKEN
 from .models import Contract, Order, Update, MessageRecipient
 
-login = 'АВХ'
+login = 'ASD'
 password = '123'
 
 
@@ -24,6 +24,8 @@ def parse_vz_v2(username: str, pwd: str):
     contract_date_from = '2019-12-20'
     contract_date_to = '2020-12-31'
 
+    disp_status_to_not_fetch_comments = ['7', '10']
+    
     vz_root_url = 'http://web.volgzakaz.ru:8080/controller'
 
     disp_status_to_not_fetch_comments = ['7', '10']
@@ -138,8 +140,9 @@ def parse_vz_v2(username: str, pwd: str):
 
         for order in orders_json['data']['data']:
             comments_text = ''
-            # Если заявка - не закупка у ед. поставщика, получить комментарии
-            if order['PURCHASEMODE_ID'] != '3':
+            # Если заявка - не закупка у ед. поставщика, получить комментарии, либо получить комментарии если это заявка не на "обр. завершена", "отказан"
+            if (order['PURCHASEMODE_ID'] == '3' and order['DISPSTATUS_ID'] not in disp_status_to_not_fetch_comments) \
+                    or order['PURCHASEMODE_ID'] != '3':
                 fetch_comments_dict = {
                     'arg': order['ID'],
                 }
